@@ -200,6 +200,9 @@ const Dots = () =>
     {[0, 0.3, 0.6].map((d, i) => <span key={i} style={{ animation: `blink 1s infinite ${d}s` }}>.</span>)}
   </span>;
 
+const BlinkingDot = () =>
+  <span style={{ display: "inline-block", width: 8, height: 8, background: C.green, borderRadius: "50%", marginLeft: 8, animation: "pulse 1s infinite" }} />;
+
 function VulnBar({ v }) {
   const col = v > 7 ? C.red : v > 4 ? C.amber : C.green;
   return <div style={{ display: "flex", gap: 2 }}>{Array.from({ length: 10 }, (_, i) => <div key={i} style={{ width: 4, height: 14, background: i < v ? col : C.surfaceHigh }} />)}</div>;
@@ -747,7 +750,46 @@ function WelcomeScreen({ onStart }) {
 // ─────────────────────────────────────────────
 // SCREEN: WAR ROOM DASHBOARD
 // ─────────────────────────────────────────────
+// --- POMODORO TIMER FOR ADHD FOCUS ---
+function PomodoroTimer({ onComplete }) {
+  const [timeLeft, setTimeLeft] = useState(25 * 60); // 25 minutes
+  const [isActive, setIsActive] = useState(false);
+
+  useEffect(() => {
+    let interval = null;
+    if (isActive && timeLeft > 0) {
+      interval = setInterval(() => {
+        setTimeLeft(timeLeft - 1);
+      }, 1000);
+    } else if (timeLeft === 0) {
+      setIsActive(false);
+      speak("Focus session complete. Great job, operative. Take a 5 minute break.", null, null);
+      onComplete && onComplete();
+    }
+    return () => clearInterval(interval);
+  }, [isActive, timeLeft, onComplete]);
+
+  const toggle = () => setIsActive(!isActive);
+  const reset = () => { setIsActive(false); setTimeLeft(25 * 60); };
+  const mins = Math.floor(timeLeft / 60);
+  const secs = timeLeft % 60;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, background: "rgba(0,0,0,0.9)", border: `1px dashed ${C.green}50`, padding: "30px 40px", borderRadius: 12, boxShadow: `0 0 40px ${C.green}10` }}>
+      <Mono s={14} c={C.green} style={{ letterSpacing: "4px" }}>HYPER FOCUS LINK ESTABLISHED</Mono>
+      <div style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 60, fontWeight: "bold", color: isActive ? C.green : C.text, textShadow: isActive ? `0 0 20px ${C.green}80` : "none" }}>
+        {mins.toString().padStart(2, '0')}:{secs.toString().padStart(2, '0')}
+      </div>
+      <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
+        <Btn onClick={toggle} v={isActive ? "ghost" : "green"} sz="md">{isActive ? "PAUSE CALIBRATION" : "INITIATE FOCUS SEQUENCE"}</Btn>
+        <Btn onClick={reset} v="ghost" sz="md">ABORT</Btn>
+      </div>
+    </div>
+  );
+}
+
 function WarRoomScreen({ session, dispatch, onGoBattle, onGoSocrates, onGoExam, onGoSpeedRun, onGoIntel, onGoAvatars }) {
+  const [adhdMode, setAdhdMode] = useState(false);
   const [selectedTopic, setSelectedTopic] = useState(session.topics[0]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
@@ -827,36 +869,54 @@ Create exactly ${numDays} entries, one per day. Prioritize high-vulnerability to
             {session.name?.toUpperCase()} — {session.topics.length} VULNERABILITIES — {session.totalXP} XP
           </Mono>
         </div>
-        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
+          {/* ADHD Toggle */}
+          <button onClick={() => setAdhdMode(!adhdMode)} style={{
+            background: adhdMode ? C.green : "transparent", color: adhdMode ? "#000" : C.textDim,
+            border: `1px solid ${adhdMode ? C.green : C.border}`, padding: "6px 12px", borderRadius: 4,
+            fontFamily: "'IBM Plex Mono',monospace", fontSize: 11, cursor: "pointer", textTransform: "uppercase", transition: "all 0.2s"
+          }}>
+            {adhdMode ? "👁️ SENSORY OVERRIDE ON" : "👁️ ADHD FOCUS OFF"}
+          </button>
           {/* Exam Countdown */}
-          <div style={{ display: "flex", gap: 6, alignItems: "center", background: C.surface, border: `1px solid ${daysLeft !== null && daysLeft <= 3 ? C.red : C.border}`, padding: "6px 12px" }}>
-            <Mono s={9} c={C.textDim}>📅 EXAM:</Mono>
-            <input type="date" value={examDate} onChange={e => handleExamDate(e.target.value)}
-              style={{ background: "transparent", border: "none", color: daysLeft !== null && daysLeft <= 3 ? C.red : C.text, fontFamily: "'IBM Plex Mono',monospace", fontSize: 11, outline: "none", cursor: "pointer" }}
-            />
-            {daysLeft !== null && <Mono s={10} c={daysLeft <= 3 ? C.red : daysLeft <= 7 ? C.amber : C.green} style={{ letterSpacing: "1px" }}>{daysLeft}d left</Mono>}
-          </div>
-          <Btn onClick={onGoAvatars} v="ghost" sz="sm">👤 AVATARS</Btn>
-          <Btn onClick={onGoExam} v="amber" sz="sm">⬡ EXAM MODE</Btn>
-          <DefconMeter avgVuln={avgVuln} />
+          {!adhdMode && (
+            <div style={{ display: "flex", gap: 6, alignItems: "center", background: C.surface, border: `1px solid ${daysLeft !== null && daysLeft <= 3 ? C.red : C.border}`, padding: "6px 12px" }}>
+              <Mono s={9} c={C.textDim}>📅 EXAM:</Mono>
+              <input type="date" value={examDate} onChange={e => handleExamDate(e.target.value)}
+                style={{ background: "transparent", border: "none", color: daysLeft !== null && daysLeft <= 3 ? C.red : C.text, fontFamily: "'IBM Plex Mono',monospace", fontSize: 11, outline: "none", cursor: "pointer" }}
+              />
+              {daysLeft !== null && <Mono s={10} c={daysLeft <= 3 ? C.red : daysLeft <= 7 ? C.amber : C.green} style={{ letterSpacing: "1px" }}>{daysLeft}d left</Mono>}
+            </div>
+          )}
+          {!adhdMode && <Btn onClick={onGoAvatars} v="ghost" sz="sm">👤 AVATARS</Btn>}
+          {!adhdMode && <Btn onClick={onGoExam} v="amber" sz="sm">⬡ EXAM MODE</Btn>}
+          {!adhdMode && <DefconMeter avgVuln={avgVuln} />}
         </div>
       </div>
 
+      {adhdMode && (
+        <div style={{ marginBottom: 40, display: "flex", justifyContent: "center", animation: "fadeUp 0.4s ease" }}>
+          <PomodoroTimer />
+        </div>
+      )}
+
       {/* Quick stats */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10, marginBottom: 20 }}>
-        {[
-          { label: "ACCURACY", value: `${accuracy}%`, color: accuracy < 50 ? C.red : accuracy < 75 ? C.amber : C.green },
-          { label: "QUESTIONS", value: session.history.length, color: C.text },
-          { label: "TOTAL XP", value: session.totalXP, color: C.amberLight },
-          { label: "AVG VULNERABILITY", value: `${avgVuln}/10`, color: avgVuln > 6 ? C.red : avgVuln > 3 ? C.amber : C.green },
-        ].map(s => (
-          <Card key={s.label} style={{ padding: "14px 16px", textAlign: "center" }}>
-            <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 30, color: s.color, lineHeight: 1 }}>{s.value}</div>
-            <Mono s={8} c={C.textDim} style={{ display: "block", marginTop: 3, letterSpacing: "2px" }}>{s.label}</Mono>
-          </Card>
-        ))}
-        <ReadinessScore session={session} />
-      </div>
+      {!adhdMode && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10, marginBottom: 20 }}>
+          {[
+            { label: "ACCURACY", value: `${accuracy}%`, color: accuracy < 50 ? C.red : accuracy < 75 ? C.amber : C.green },
+            { label: "QUESTIONS", value: session.history.length, color: C.text },
+            { label: "TOTAL XP", value: session.totalXP, color: C.amberLight },
+            { label: "AVG VULNERABILITY", value: `${avgVuln}/10`, color: avgVuln > 6 ? C.red : avgVuln > 3 ? C.amber : C.green },
+          ].map(s => (
+            <Card key={s.label} style={{ padding: "14px 16px", textAlign: "center" }}>
+              <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 30, color: s.color, lineHeight: 1 }}>{s.value}</div>
+              <Mono s={8} c={C.textDim} style={{ display: "block", marginTop: 3, letterSpacing: "2px" }}>{s.label}</Mono>
+            </Card>
+          ))}
+          <ReadinessScore session={session} />
+        </div>
+      )}
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 360px", gap: 16 }}>
         {/* Left column */}
@@ -1891,10 +1951,46 @@ function IntelBriefingScreen({ topic, session, onBack, onAttack }) {
 }
 
 // ─────────────────────────────────────────────
+// SCREEN: BOOT SEQUENCE (CINEMATIC INTRO)
+// ─────────────────────────────────────────────
+function BootSequence({ onComplete }) {
+  const [step, setStep] = useState(0);
+  const msgs = [
+    "INITIALIZING NEURAL LINK...",
+    "SYNCING KNOWLEDGE TOPOLOGY...",
+    "ESTABLISHING CONNECTION TO ORCHESTRATOR...",
+    "DECRYPTING MISSION FILES...",
+    "BYPASSING COGNITIVE FIREWALLS...",
+    "ACCESS GRANTED."
+  ];
+
+  useEffect(() => {
+    const intervals = [600, 1400, 2200, 3000, 3800, 4600];
+    intervals.forEach((delay, i) => {
+      setTimeout(() => setStep(i + 1), delay);
+    });
+    setTimeout(onComplete, 6000);
+  }, [onComplete]);
+
+  return (
+    <div style={{ minHeight: "100vh", background: "#000", color: C.green, padding: "40px 10%", fontFamily: "'IBM Plex Mono', monospace", display: "flex", flexDirection: "column", justifyContent: "center" }}>
+      <div style={{ maxWidth: 800, width: "100%" }}>
+        {msgs.slice(0, step).map((m, i) => (
+          <div key={i} style={{ marginBottom: 16, fontSize: i === msgs.length - 1 ? 24 : 14, fontWeight: i === msgs.length - 1 ? "bold" : "normal", animation: "fadeUp 0.1s ease", textShadow: `0 0 10px ${C.green}80` }}>
+            <span style={{ opacity: 0.5 }}>[{Date.now() + i * 100}]</span> {m}
+          </div>
+        ))}
+        {step < msgs.length && <BlinkingDot />}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
 // ROOT APP
 // ─────────────────────────────────────────────
 export default function App() {
-  const [screen, setScreen] = useState("welcome");
+  const [screen, setScreen] = useState("boot");
   const [session, dispatch] = useReducer(reducer, init);
   const [battleTopic, setBattleTopic] = useState(null);
   const [battleMode, setBattleMode] = useState("nemesis");
@@ -1912,6 +2008,7 @@ export default function App() {
   return (
     <>
       <style>{CSS}</style>
+      {screen === "boot" && <BootSequence onComplete={() => setScreen("welcome")} />}
       {screen === "welcome" && <WelcomeScreen onStart={handleStart} />}
       {screen === "warroom" && (
         <WarRoomScreen
